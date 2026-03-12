@@ -1,0 +1,65 @@
+<?php
+declare(strict_types = 1);
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+require 'cms/includes/database-connection.php';
+require 'cms/includes/functions.php';
+
+$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+if (!$id) {
+    include 'page-not-found.php';
+}
+
+$sql = "SELECT forename, surname, joined, picture FROM member WHERE mem_id = :id;";
+$member = pdo($pdo, $sql, [$id])->fetch();
+if (!$member) {
+    include 'page-not-found.php';
+}
+
+$sql = "SELECT a.act_id AS id, a.title, a.summary, a.category_id, a.member_id,
+               c.name        AS category,
+               CONCAT(m.forename, ' ', m.surname) AS author,
+               i.file        AS image_file,
+               i.alt         AS image_alt
+          FROM article    AS a
+          JOIN category   AS c  ON a.category_id = c.cat_id
+          JOIN member     AS m  ON a.member_id   = m.mem_id
+          LEFT JOIN image AS i  ON a.image_id    = i.img_id
+         WHERE a.member_id = :id AND a.published = 1
+         ORDER BY a.act_id DESC;";
+$articles = pdo($pdo, $sql, [$id])->fetchAll();
+
+$sql = "SELECT cat_id AS id, name FROM category WHERE navigation = 1;";
+$navigation  = pdo($pdo, $sql)->fetchAll();
+$section     = '';
+$title       = $member['forename'] . ' ' . $member['surname'];
+$description = $title . ' on Creative Folk';
+?>
+<?php include 'cms/includes/header.php'; ?>
+<main class="container" id="content">
+    <section class="header">
+        <h1><?= html_escape($member['forename']) . ' ' . $member['surname'] ?></h1>
+        <p class="member"><b>Member since:</b> <?= format_date($member['joined']) ?></p>
+        <img src="uploads/<?= html_escape($member['picture']) ?? 'member.png' ?>"
+             alt="<?= html_escape($member['forename']) ?>" class="profile"><br>
+    </section>
+    <section class="grid">
+        <?php foreach ($articles as $article) { ?>
+        <article class="summary">
+            <a href="article.php?id=<?= $article['id'] ?>">
+                <img src="cms/uploads/<?= html_escape($article['image_file'] ?? 'blank.png') ?>"
+                     alt="<?= html_escape($article['image_alt']) ?>">
+                <h2><?= html_escape($article['title']) ?></h2>
+                <p><?= html_escape($article['summary']) ?></p>
+            </a>
+            <p class="credit">
+                Posted in <a href="category.php?id=<?= $article['category_id'] ?>">
+                    <?= html_escape($article['category']) ?></a>
+                by <a href="member.php?id=<?= $article['member_id'] ?>">
+                    <?= html_escape($article['author']) ?></a>
+            </p>
+        </article>
+        <?php } ?>
+    </section>
+</main>
+<?php include 'cms/includes/footer.php'; ?>
